@@ -1,4 +1,6 @@
 testdata.out
+testdata.csv
+examine.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
