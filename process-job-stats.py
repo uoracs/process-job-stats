@@ -87,11 +87,13 @@ def test_calculate_compute_hours():
     assert calculate_compute_hours(1, "2-14:11:33") == 62.1925
 
 
-def parse_line(line: str) -> dict:
+def parse_line(line: str) -> dict | None:
     """
     29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335
     job_id|job_name|username|account|partition|elapsed|nodes|cpus|tres|submit_time|start_time|nodelist
     """
+    if line.startswith("JobID"):
+        return None
     job = {}
     p = [e.strip() for e in line.split("|") if e.strip()]
     job["job_id"] = p[0]
@@ -100,6 +102,8 @@ def parse_line(line: str) -> dict:
     job["account"] = p[3]
     job["partition"] = p[4]
     job["elapsed"] = p[5]
+    if parse_elapsed_to_seconds(job["elapsed"]) == 0:
+        return None
     job["nodes"] = int(p[6])
     job["cpus"] = int(p[7])
     job["tres"] = p[8]
@@ -178,7 +182,8 @@ def main():
             print(",".join(JOB_FIELDS), file=out)
         for line in sys.stdin:
             job = parse_line(line)
-            csvwriter.writerow(job.values())
+            if job:
+                csvwriter.writerow(job.values())
     except:
         out.close()
         raise
