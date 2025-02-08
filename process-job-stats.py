@@ -17,11 +17,13 @@ JOB_FIELDS = [
     "tres",
     "submit_time",
     "start_time",
+    "end_time",
     "nodelist",
     "gpus",
     "wait_time_hours",
     "cpu_hours",
     "gpu_hours",
+    "date",
 ]
 
 
@@ -68,6 +70,9 @@ def parse_elapsed_to_seconds(elapsed: str) -> int:
     h, m, s = [int(p) for p in elapsed.split(":")]
     return e_days * 86400 + h * 60 * 60 + m * 60 + s
 
+def get_day_date_from_iso(iso: str) -> str:
+    return iso.split("T")[0]
+
 
 def test_parse_elapsed_to_seconds():
     assert parse_elapsed_to_seconds("00:00:01") == 1
@@ -109,19 +114,21 @@ def parse_line(line: str) -> dict | None:
     job["tres"] = p[8]
     job["submit_time"] = p[9]
     job["start_time"] = p[10]
-    job["nodelist"] = p[11]
+    job["end_time"] = p[11]
+    job["nodelist"] = p[12]
     job["gpus"] = calculate_gpus_from_tres(job["tres"])
     job["wait_time_hours"] = calculate_wait_time_hours(
         job["submit_time"], job["start_time"]
     )
     job["cpu_hours"] = calculate_compute_hours(job["cpus"], job["elapsed"])
     job["gpu_hours"] = calculate_compute_hours(job["gpus"], job["elapsed"])
+    job["date"] = get_day_date_from_iso(job["end_time"])
     return job
 
 
 def test_parse_line():
     job1 = parse_line(
-        "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335"
+        "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|2025-02-03T23:53:21|n0335"
     )
     assert job1["job_id"] == "29148459_925"
     assert job1["job_name"] == "ld_stats_array"
@@ -134,13 +141,15 @@ def test_parse_line():
     assert job1["tres"] == "billing=8,cpu=8,mem=64G,node=1"
     assert job1["submit_time"] == "2025-02-03T23:38:14"
     assert job1["start_time"] == "2025-02-03T23:53:21"
+    assert job1["end_time"] == "2025-02-03T23:53:21"
     assert job1["nodelist"] == "n0335"
     assert job1["gpus"] == 0
     assert job1["wait_time_hours"] == 0.25194444444444447
     assert job1["cpu_hours"] == 0.9844444444444445
     assert job1["gpu_hours"] == 0.0
+    assert job1["date"] == "2025-02-03"
     job2 = parse_line(
-        "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1,gres/gpu=4|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335"
+        "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1,gres/gpu=4|2025-02-03T23:38:14|2025-02-03T23:53:21|2025-02-03T23:53:21|n0335"
     )
     assert job2["job_id"] == "29148459_925"
     assert job2["job_name"] == "ld_stats_array"
@@ -153,11 +162,13 @@ def test_parse_line():
     assert job2["tres"] == "billing=8,cpu=8,mem=64G,node=1,gres/gpu=4"
     assert job2["submit_time"] == "2025-02-03T23:38:14"
     assert job2["start_time"] == "2025-02-03T23:53:21"
+    assert job1["end_time"] == "2025-02-03T23:53:21"
     assert job2["nodelist"] == "n0335"
     assert job2["gpus"] == 4
     assert job2["wait_time_hours"] == 0.25194444444444447
     assert job2["cpu_hours"] == 0.9844444444444445
     assert job2["gpu_hours"] == 0.4922222222222222
+    assert job2["date"] == "2025-02-03"
 
 
 def main():

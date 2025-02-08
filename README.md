@@ -6,7 +6,7 @@ Python script to take specific SLURM job parsable output, derive statistics, and
 
 This script assumes you're using the SLURM format string:
 
-`JobID|JobName|User|Account|Partition|Elapsed|NNodes|NCPUS|AllocTRES|Submit|Start|NodeList`
+`JobID|JobName|User|Account|Partition|Elapsed|NNodes|NCPUS|AllocTRES|Submit|Start|End|NodeList`
 
 and you're using the `parsable2` flag, `-P`, omitting job steps, `-X`, and not printing the header `-n`.
 
