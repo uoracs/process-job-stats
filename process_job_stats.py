@@ -4,6 +4,8 @@ import argparse
 from datetime import datetime
 import sys
 import csv
+from enum import Enum
+import json
 
 JOB_FIELDS = [
     "job_id",
@@ -24,7 +26,27 @@ JOB_FIELDS = [
     "cpu_hours",
     "gpu_hours",
     "date",
+    "category",
 ]
+
+OPEN_USE_PARTITIONS = [
+    "compute",
+    "compute_intel",
+    "computelong",
+    "computelong_intel",
+    "gpu",
+    "gpulong",
+    "interactive",
+    "interactivegpu",
+    "memory",
+    "memorylong",
+]
+
+
+class JobCategory(Enum):
+    OPEN = "open-use"
+    DONATED = "donated"
+    CONDO = "condo"
 
 
 def calculate_wait_time_hours(iso1: str, iso2: str) -> float:
@@ -67,13 +89,33 @@ def calculate_compute_hours(number: int, elapsed: str) -> float:
     return int(number) * elapsed_seconds / 60 / 60
 
 
-def parse_line(line: str) -> dict | None:
+def categorize_job(
+    nodemap: dict[str, list[str]], partition: str, nodelist: str
+) -> tuple[list[JobCategory], float, float]:
+    if partition in OPEN_USE_PARTITIONS:
+        return ([JobCategory.OPEN], 1.0, 0.0)
+    if partition != "preempt":
+        return ([JobCategory.CONDO], 0.0, 1.0)
+    node_c = 0
+    open_n = 0
+    for node in nodelist.split(","):
+        node_c += 1
+        for nmp in nodemap[node]:
+            if nmp in OPEN_USE_PARTITIONS:
+                open_n += 1
+    open_wt = node_c / open_n
+    condo_wt = 1 - open_wt
+    return ([JobCategory.OPEN, JobCategory.CONDO], open_wt, condo_wt)
+
+
+def parse_line(nodemap: dict, line: str) -> list[dict] | None:
     """
     29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335
     job_id|job_name|username|account|partition|elapsed|nodes|cpus|tres|submit_time|start_time|nodelist
     """
     if line.startswith("JobID"):
         return None
+    jobs = []
     job = {}
     p = [e.strip() for e in line.split("|") if e.strip()]
     job["job_id"] = p[0]
@@ -98,7 +140,30 @@ def parse_line(line: str) -> dict | None:
     job["cpu_hours"] = calculate_compute_hours(job["cpus"], job["elapsed"])
     job["gpu_hours"] = calculate_compute_hours(job["gpus"], job["elapsed"])
     job["date"] = get_day_date_from_iso(job["end_time"])
-    return job
+
+    categories, open_wt, condo_wt = categorize_job(nodemap, job["partition"], job["nodelist"])
+    for c in categories:
+        job["category"] = c
+        job[""]
+        jobs.append(job)
+    return jobs
+
+
+def generate_node_map(stdin) -> None:
+    """
+    uses sys.stdin and generates a node map with the outpuf from `sinfo -N -o "%n|%P"`
+    """
+    m: dict[str, list[str]] = {}
+    for line in sys.stdin:
+        if not line.strip():
+            continue
+        node, partition = line.split("|")
+        if partition == "preempt":
+            continue
+        if node not in m:
+            m[node] = []
+        m[node].append(partition)
+    print(json.dumps(m))
 
 
 def main():
@@ -107,22 +172,41 @@ def main():
     parser.add_argument(
         "-n", "--noheader", required=False, help="don't show header row"
     )
+    parser.add_argument(
+        "-m",
+        "--nodemap",
+        required=True,
+        help="path to the node map json file generated with --generate_node_map",
+    )
+    parser.add_argument(
+        "-g",
+        "--generate_node_map",
+        required=False,
+        help='pipe output of `sinfo -N -o "%n|%P"` to this program and generate the node map file and exit',
+    )
     args = parser.parse_args()
 
     try:
         out = sys.stdout
         if args.output:
             out = open(args.output, "w")
-        csvwriter = csv.writer(out)
     except:
         out.close()
         raise
 
+    if args.generate_node_map:
+        generate_node_map(sys.stdin)
+        exit(0)
+
+    with open(args.nodemap, "r") as f:
+        nodemap = json.load(f)
+
     try:
+        csvwriter = csv.writer(out)
         if not args.noheader:
             print(",".join(JOB_FIELDS), file=out)
         for line in sys.stdin:
-            job = parse_line(line)
+            job = parse_line(nodemap, line)
             if job:
                 csvwriter.writerow(job.values())
     except:

@@ -1,34 +1,35 @@
-from process_job_stats import *
+import process_job_stats as pjs
 
 
 def test_calculate_wait_time_hours():
     assert (
-        calculate_wait_time_hours("2025-02-03T23:38:00", "2025-02-03T23:53:00") == 0.25
+        pjs.calculate_wait_time_hours("2025-02-03T23:38:00", "2025-02-03T23:53:00")
+        == 0.25
     )
 
 
 def test_calculate_gpus_from_tres():
     notres = "billing=8,cpu=8,mem=64G,node=1"
     tres = "billing=8,cpu=8,mem=64G,node=1,gres/gpu=4"
-    assert calculate_gpus_from_tres(notres) == 0
-    assert calculate_gpus_from_tres(tres) == 4
+    assert pjs.calculate_gpus_from_tres(notres) == 0
+    assert pjs.calculate_gpus_from_tres(tres) == 4
 
 
 def test_parse_elapsed_to_seconds():
-    assert parse_elapsed_to_seconds("00:00:01") == 1
-    assert parse_elapsed_to_seconds("1-00:00:01") == 86401
-    assert parse_elapsed_to_seconds("00:01:01") == 61
-    assert parse_elapsed_to_seconds("11:11:11") == 40271
+    assert pjs.parse_elapsed_to_seconds("00:00:01") == 1
+    assert pjs.parse_elapsed_to_seconds("1-00:00:01") == 86401
+    assert pjs.parse_elapsed_to_seconds("00:01:01") == 61
+    assert pjs.parse_elapsed_to_seconds("11:11:11") == 40271
 
 
 def test_calculate_compute_hours():
-    assert calculate_compute_hours(1, "01:00:00") == 1.0
-    assert calculate_compute_hours(1, "00:30:00") == 0.5
-    assert calculate_compute_hours(1, "2-14:11:33") == 62.1925
+    assert pjs.calculate_compute_hours(1, "01:00:00") == 1.0
+    assert pjs.calculate_compute_hours(1, "00:30:00") == 0.5
+    assert pjs.calculate_compute_hours(1, "2-14:11:33") == 62.1925
 
 
 def test_parse_line():
-    job1 = parse_line(
+    job1 = pjs.parse_line(
         "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|2025-02-03T23:53:21|n0335"
     )
     assert job1["job_id"] == "29148459_925"
@@ -49,7 +50,7 @@ def test_parse_line():
     assert job1["cpu_hours"] == 0.9844444444444445
     assert job1["gpu_hours"] == 0.0
     assert job1["date"] == "2025-02-03"
-    job2 = parse_line(
+    job2 = pjs.parse_line(
         "29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1,gres/gpu=4|2025-02-03T23:38:14|2025-02-03T23:53:21|2025-02-03T23:53:21|n0335"
     )
     assert job2["job_id"] == "29148459_925"
@@ -70,3 +71,6 @@ def test_parse_line():
     assert job2["cpu_hours"] == 0.9844444444444445
     assert job2["gpu_hours"] == 0.4922222222222222
     assert job2["date"] == "2025-02-03"
+
+def test_categorize_job():
+    
