@@ -4,10 +4,7 @@ import argparse
 from datetime import datetime
 import sys
 import csv
-<<<<<<< Updated upstream
-=======
 from enum import Enum
->>>>>>> Stashed changes
 
 JOB_FIELDS = [
     "job_id",
@@ -30,8 +27,6 @@ JOB_FIELDS = [
     "date",
 ]
 
-<<<<<<< Updated upstream
-=======
 OPEN_USE_PARTITIONS = [
     "compute",
     "compute_intel",
@@ -51,7 +46,6 @@ class JobCategory(Enum):
     DONATED = "donated"
     CONDO = "condo"
 
->>>>>>> Stashed changes
 
 def calculate_wait_time_hours(iso1: str, iso2: str) -> float:
     dt1 = datetime.fromisoformat(iso1)
@@ -93,8 +87,6 @@ def calculate_compute_hours(number: int, elapsed: str) -> float:
     return int(number) * elapsed_seconds / 60 / 60
 
 
-<<<<<<< Updated upstream
-=======
 def categorize_job(partition: str) -> JobCategory:
     if partition in OPEN_USE_PARTITIONS:
         return JobCategory.OPEN
@@ -103,7 +95,6 @@ def categorize_job(partition: str) -> JobCategory:
     return JobCategory.CONDO
 
 
->>>>>>> Stashed changes
 def parse_line(line: str) -> dict | None:
     """
     29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335
