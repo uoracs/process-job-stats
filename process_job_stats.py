@@ -23,6 +23,7 @@ JOB_FIELDS = [
     "category",
     "gpus",
     "wait_time_hours",
+    "run_time_hours",
     "cpu_hours",
     "gpu_hours",
     "date",
@@ -88,6 +89,10 @@ def calculate_compute_hours(number: int, elapsed: str) -> float:
     return int(number) * elapsed_seconds / 60 / 60
 
 
+def calculate_run_time_hours(elapsed: str) -> float:
+    return parse_elapsed_to_seconds(elapsed) / 60 / 60
+
+
 def categorize_job(partition: str) -> JobCategory:
     if partition in OPEN_USE_PARTITIONS:
         return JobCategory.OPEN
@@ -125,6 +130,7 @@ def parse_line(line: str) -> dict | None:
     job["wait_time_hours"] = str(
         calculate_wait_time_hours(job["submit_time"], job["start_time"])
     )
+    job["run_time_hours"] = str(calculate_run_time_hours(job["elapsed"]))
     job["cpu_hours"] = str(calculate_compute_hours(int(job["cpus"]), job["elapsed"]))
     job["gpu_hours"] = str(calculate_compute_hours(int(job["gpus"]), job["elapsed"]))
     job["date"] = get_day_date_from_iso(job["end_time"])
