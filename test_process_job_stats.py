@@ -70,3 +70,12 @@ def test_parse_line():
     assert job2["cpu_hours"] == 0.9844444444444445
     assert job2["gpu_hours"] == 0.4922222222222222
     assert job2["date"] == "2025-02-03"
+<<<<<<< Updated upstream
+=======
+
+
+def test_categorize_job():
+    assert pjs.categorize_job("preempt") == pjs.JobCategory.DONATED
+    assert pjs.categorize_job("intel") == pjs.JobCategory.OPEN
+    assert pjs.categorize_job("special") == pjs.JobCategory.CONDO
+>>>>>>> Stashed changes

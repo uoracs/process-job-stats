@@ -4,6 +4,10 @@ import argparse
 from datetime import datetime
 import sys
 import csv
+<<<<<<< Updated upstream
+=======
+from enum import Enum
+>>>>>>> Stashed changes
 
 JOB_FIELDS = [
     "job_id",
@@ -26,6 +30,28 @@ JOB_FIELDS = [
     "date",
 ]
 
+<<<<<<< Updated upstream
+=======
+OPEN_USE_PARTITIONS = [
+    "compute",
+    "compute_intel",
+    "computelong",
+    "computelong_intel",
+    "gpu",
+    "gpulong",
+    "interactive",
+    "interactivegpu",
+    "memory",
+    "memorylong",
+]
+
+
+class JobCategory(Enum):
+    OPEN = "open_use"
+    DONATED = "donated"
+    CONDO = "condo"
+
+>>>>>>> Stashed changes
 
 def calculate_wait_time_hours(iso1: str, iso2: str) -> float:
     dt1 = datetime.fromisoformat(iso1)
@@ -67,6 +93,17 @@ def calculate_compute_hours(number: int, elapsed: str) -> float:
     return int(number) * elapsed_seconds / 60 / 60
 
 
+<<<<<<< Updated upstream
+=======
+def categorize_job(partition: str) -> JobCategory:
+    if partition in OPEN_USE_PARTITIONS:
+        return JobCategory.OPEN
+    if partition == "preempt":
+        return JobCategory.DONATED
+    return JobCategory.CONDO
+
+
+>>>>>>> Stashed changes
 def parse_line(line: str) -> dict | None:
     """
     29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335
@@ -84,19 +121,20 @@ def parse_line(line: str) -> dict | None:
     job["elapsed"] = p[5]
     if parse_elapsed_to_seconds(job["elapsed"]) == 0:
         return None
-    job["nodes"] = int(p[6])
-    job["cpus"] = int(p[7])
+    job["nodes"] = p[6]
+    job["cpus"] = p[7]
     job["tres"] = p[8]
     job["submit_time"] = p[9]
     job["start_time"] = p[10]
     job["end_time"] = p[11]
     job["nodelist"] = p[12]
-    job["gpus"] = calculate_gpus_from_tres(job["tres"])
-    job["wait_time_hours"] = calculate_wait_time_hours(
-        job["submit_time"], job["start_time"]
+    job["category"] = str(categorize_job(job["partition"]))
+    job["gpus"] = str(calculate_gpus_from_tres(job["tres"]))
+    job["wait_time_hours"] = str(
+        calculate_wait_time_hours(job["submit_time"], job["start_time"])
     )
-    job["cpu_hours"] = calculate_compute_hours(job["cpus"], job["elapsed"])
-    job["gpu_hours"] = calculate_compute_hours(job["gpus"], job["elapsed"])
+    job["cpu_hours"] = str(calculate_compute_hours(int(job["cpus"]), job["elapsed"]))
+    job["gpu_hours"] = str(calculate_compute_hours(int(job["gpus"]), job["elapsed"]))
     job["date"] = get_day_date_from_iso(job["end_time"])
     return job
 
