@@ -1,3 +1,3 @@
 
 test:
-	pytest -v process-job-stats.py
+	pytest -v test_process_job_stats.py
