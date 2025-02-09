@@ -20,6 +20,7 @@ JOB_FIELDS = [
     "start_time",
     "end_time",
     "nodelist",
+    "category",
     "gpus",
     "wait_time_hours",
     "cpu_hours",
@@ -119,7 +120,7 @@ def parse_line(line: str) -> dict | None:
     job["start_time"] = p[10]
     job["end_time"] = p[11]
     job["nodelist"] = p[12]
-    job["category"] = str(categorize_job(job["partition"]))
+    job["category"] = categorize_job(job["partition"]).value
     job["gpus"] = str(calculate_gpus_from_tres(job["tres"]))
     job["wait_time_hours"] = str(
         calculate_wait_time_hours(job["submit_time"], job["start_time"])
