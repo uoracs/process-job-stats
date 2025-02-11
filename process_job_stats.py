@@ -334,7 +334,8 @@ def main():
     aps = AccountPIs()
 
     try:
-        for i, line in enumerate(sys.stdin):
+        rawjobdata = RawJobData()
+        for i, line in enumerate(rawjobdata.jobs):
             logger.debug(f"Processing job {i}")
             job = Job(line, node_partitions=nps, account_storages=ass, account_pis=aps)
             if not args.noheader and i == 0:
