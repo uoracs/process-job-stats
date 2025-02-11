@@ -147,7 +147,7 @@ class Job:
     account: str
     partition: str
     elapsed: str
-    nodes: str
+    nodes: int
     cpus: int
     tres: str
     submit_time: str
@@ -199,7 +199,7 @@ class Job:
         self.elapsed = p[5]
         if self.parse_elapsed_to_seconds(self.elapsed) == 0:
             return None
-        self.nodes = p[6]
+        self.nodes = int(p[6])
         self.cpus = int(p[7])
         self.tres = p[8]
         self.submit_time = p[9]
@@ -336,7 +336,7 @@ def main():
     try:
         rawjobdata = RawJobData()
         for i, line in enumerate(rawjobdata.jobs):
-            logger.debug(f"Processing job {i}")
+            logger.debug(f"Processing job {i}: {line}")
             job = Job(line, node_partitions=nps, account_storages=ass, account_pis=aps)
             if not args.noheader and i == 0:
                 print(",".join(job.keys()), file=out)
