@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import os
 import subprocess
 import sys
@@ -8,32 +9,9 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
 from pwd import getpwuid
-from typing import Dict, List
+from typing import Any, Dict, List
 
 YESTERDAY_DATE = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-JOB_FIELDS = [
-    "job_id",
-    "job_name",
-    "username",
-    "account",
-    "partition",
-    "elapsed",
-    "nodes",
-    "cpus",
-    "tres",
-    "submit_time",
-    "start_time",
-    "end_time",
-    "nodelist",
-    "category",
-    "gpus",
-    "wait_time_hours",
-    "run_time_hours",
-    "cpu_hours",
-    "gpu_hours",
-    "date",
-]
 
 OPEN_USE_PARTITIONS = [
     "compute",
@@ -52,60 +30,94 @@ SLURM_BIN_DIR = "/gpfs/t2/slurm/apps/current/bin"
 GPFS_BIN_DIR = "/usr/lpp/mmfs/bin"
 
 
-def get_node_partition_map() -> Dict[str, str]:
-    try:
-        s = subprocess.run(
-            f"{SLURM_BIN_DIR}/sinfo -h -o '%n,%P'", shell=True, stdout=subprocess.PIPE
-        )
-        entries = [
-            line.strip() for line in s.stdout.decode().split("\n") if line.strip()
-        ]
-        return {item.split(",")[0]: item.split(",")[1] for item in entries}
-    except Exception as e:
-        print(f"Failed to parse node partition data: {e}")
-        exit(1)
+class RawJobData:
+    def __init__(self):
+        try:
+            cmd = f"sacct -X -P -n --starttime='{YESTERDAY_DATE}T00:00:00' --endtime='{YESTERDAY_DATE}T23:59:59' --state=F,CD --format=JobID,JobName,User,Account,Partition,Elapsed,NNodes,NCPUS,AllocTRES,Submit,Start,End,Nodelist"
+            self.jobs = [
+                line.strip()
+                for line in subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                .stdout.decode()
+                .split("\n")
+                if line.strip()
+            ]
+        except Exception as e:
+            print(f"Failed to get job data stdout from SLURM: {e}")
+            exit(1)
 
 
-NODE_PARTITION_MAP = get_node_partition_map()
+class NodePartitions:
+    def __init__(self):
+        try:
+            s = subprocess.run(
+                f"{SLURM_BIN_DIR}/sinfo -h -o '%n,%P'",
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
+            entries = [
+                line.strip() for line in s.stdout.decode().split("\n") if line.strip()
+            ]
+            self.node_partitions = {
+                item.split(",")[0]: item.split(",")[1] for item in entries
+            }
+        except Exception as e:
+            print(f"Failed to parse node partition data: {e}")
+            exit(1)
+
+    def get_partition(self, node: str) -> str:
+        try:
+            return self.node_partitions[node]
+        except Exception:
+            return ""
 
 
-def get_account_gpfs_storage_gb_map() -> Dict[str, int]:
-    try:
-        cmd = f"{GPFS_BIN_DIR}/mmrepquota -j fs1 --block-size g | awk '/FILESET/ {{print $1\",\"$4}}'"
-        s = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
-        entries = [
-            line.strip() for line in s.stdout.decode().split("\n") if line.strip()
-        ]
-        return {item.split(",")[0]: int(item.split(",")[1]) for item in entries}
-    except Exception as e:
-        print(f"Failed to parse GPFS storage data: {e}")
-        exit(1)
+class AccountStorages:
+    def __init__(self):
+        try:
+            cmd = f"{GPFS_BIN_DIR}/mmrepquota -j fs1 --block-size g | awk '/FILESET/ {{print $1\",\"$4}}'"
+            s = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+            entries = [
+                line.strip() for line in s.stdout.decode().split("\n") if line.strip()
+            ]
+            self.account_storage = {
+                item.split(",")[0]: int(item.split(",")[1]) for item in entries
+            }
+        except Exception as e:
+            print(f"Failed to parse GPFS storage data: {e}")
+            exit(1)
+
+    def get_storage(self, account: str) -> int:
+        try:
+            return self.account_storage[account]
+        except Exception:
+            return 0
 
 
-ACCOUNT_STORAGE_MAP = get_account_gpfs_storage_gb_map()
+class AccountPIs:
+    def __init__(self):
+        out = {}
+        try:
+            s = subprocess.run(
+                "find /gpfs/projects/* -maxdepth 0", shell=True, stdout=subprocess.PIPE
+            )
+            proj_fdirs = [
+                line.strip() for line in s.stdout.decode().split("\n") if line.strip()
+            ]
+            print("pi,account,date")
+            for d in proj_fdirs:
+                account = d.split("/")[-1]
+                pi = getpwuid(os.stat(d).st_uid).pw_name
+                out[account] = pi
+        except Exception as e:
+            print(f"Failed to parse account PI data: {e}")
+            exit(1)
+        self.account_pi = out
 
-
-def get_account_pi_map() -> Dict[str, str]:
-    out = {}
-    try:
-        s = subprocess.run(
-            "find /gpfs/projects/* -maxdepth 0", shell=True, stdout=subprocess.PIPE
-        )
-        proj_fdirs = [
-            line.strip() for line in s.stdout.decode().split("\n") if line.strip()
-        ]
-        print("pi,account,date")
-        for d in proj_fdirs:
-            account = d.split("/")[-1]
-            pi = getpwuid(os.stat(d).st_uid).pw_name
-            out[account] = pi
-    except Exception as e:
-        print(f"Failed to parse account PI data: {e}")
-        exit(1)
-    return out
-
-
-ACCOUNT_PI_MAP = get_account_pi_map()
+    def get_pi(self, account: str) -> str:
+        try:
+            return self.account_pi[account]
+        except Exception:
+            return ""
 
 
 class JobCategory(Enum):
@@ -146,10 +158,22 @@ class Job:
     run_time_hours: float
     date: str
 
-    def dict(self) -> Dict:
+    def dict(self) -> Dict[str, Any]:
         return {k: str(v) for k, v in asdict(self).items()}
 
-    def __init__(self, slurm_job_line: str):
+    def keys(self) -> List[str]:
+        return list(self.dict().keys())
+
+    def values(self) -> List[str]:
+        return list(self.dict().values())
+
+    def __init__(
+        self,
+        slurm_job_line: str,
+        node_partitions: NodePartitions,
+        account_storages: AccountStorages,
+        account_pis: AccountPIs,
+    ):
         """
         29148459_925|ld_stats_array|akapoor|kernlab|kern|00:07:23|1|8|billing=8,cpu=8,mem=64G,node=1|2025-02-03T23:38:14|2025-02-03T23:53:21|n0335
         job_id|job_name|username|account|partition|elapsed|nodes|cpus|tres|submit_time|start_time|nodelist
@@ -173,11 +197,11 @@ class Job:
         self.end_time = p[11]
         self.nodelist = p[12]
 
-        self.pi = ACCOUNT_PI_MAP[self.account]
-        self.account_storage_gb = ACCOUNT_STORAGE_MAP[self.account]
+        self.pi = account_pis.get_pi(self.account)
+        self.account_storage_gb = account_storages.get_storage(self.account)
         self.category = self.categorize_job(self.partition)
-        self.openuse_weight = self.calculate_weight(JobCategory.OPEN)
-        self.condo_weight = self.calculate_weight(JobCategory.CONDO)
+        self.openuse_weight = self.calculate_weight(JobCategory.OPEN, node_partitions)
+        self.condo_weight = self.calculate_weight(JobCategory.CONDO, node_partitions)
         self.gpus = self.calculate_gpus_from_tres(self.tres)
         self.wait_time_hours = self.calculate_wait_time_hours(
             self.submit_time, self.start_time
@@ -232,7 +256,9 @@ class Job:
             return JobCategory.DONATED
         return JobCategory.CONDO
 
-    def calculate_weight(self, category: JobCategory) -> float:
+    def calculate_weight(
+        self, category: JobCategory, node_partitions: NodePartitions
+    ) -> float:
         """
         This represents the weight of the nodes that ran in open-use nodes.
         Used to multiply by things like CPU Hours, etc, to properly weight jobs.
@@ -244,7 +270,7 @@ class Job:
         nl = len(nodes)
         for n in nodes:
             try:
-                np = NODE_PARTITION_MAP[n]
+                np = node_partitions.get_partition(n)
             except Exception:
                 nl -= 1
                 continue
@@ -281,15 +307,19 @@ def main():
     except:
         out.close()
         raise
+    writer = csv.writer(out)
+
+    nps = NodePartitions()
+    ass = AccountStorages()
+    aps = AccountPIs()
 
     try:
-        if not args.noheader:
-            print(",".join(JOB_FIELDS), file=out)
-        for line in sys.stdin:
-            job = Job(line)
+        for i, line in enumerate(sys.stdin):
+            job = Job(line, node_partitions=nps, account_storages=ass, account_pis=aps)
+            if not args.noheader and i == 0:
+                print(",".join(job.keys()), file=out)
             if job:
-                print(job.dict())
-                # write_job_to_sqlite(job)
+                writer.writerow(job.values())
     except:
         out.close()
         raise
