@@ -205,7 +205,7 @@ class Job:
         self.submit_time = p[9]
         self.start_time = p[10]
         self.end_time = p[11]
-        self.nodelist = p[12]
+        self.nodelist = self.expand_nodelist(p[12])
 
         self.pi = account_pis.get_pi(self.account)
         self.account_storage_gb = account_storages.get_storage(self.account)
@@ -220,6 +220,23 @@ class Job:
         self.cpu_hours = self.calculate_compute_hours(self.cpus, self.elapsed)
         self.gpu_hours = self.calculate_compute_hours(self.gpus, self.elapsed)
         self.date = self.get_day_date_from_iso(self.end_time)
+
+    def expand_nodelist(self, nodelist: str) -> str:
+        """Convert from SLURM nodelist syntax to comma-separated string of node names"""
+        try:
+            cmd = f"sinfo -N -n {nodelist} | sort | uniq"
+            return ",".join(
+                [
+                    line.strip()
+                    for line in subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                    .stdout.decode()
+                    .split("\n")
+                    if line.strip()
+                ]
+            )
+        except Exception as e:
+            print(f"Failed to expand nodelist: {e}")
+            exit(1)
 
     def calculate_wait_time_hours(self, iso1: str, iso2: str) -> float:
         dt1 = datetime.fromisoformat(iso1)
