@@ -35,6 +35,7 @@ GPFS_BIN_DIR = "/usr/lpp/mmfs/bin"
 
 class RawJobData:
     def __init__(self):
+        logger.debug("  Starting: Getting jobs from sacct")
         try:
             cmd = f"sacct -X -P -n --starttime='{YESTERDAY_DATE}T00:00:00' --endtime='{YESTERDAY_DATE}T23:59:59' --state=F,CD --format=JobID,JobName,User,Account,Partition,Elapsed,NNodes,NCPUS,AllocTRES,Submit,Start,End,Nodelist"
             self.jobs = [
@@ -47,10 +48,12 @@ class RawJobData:
         except Exception as e:
             print(f"Failed to get job data stdout from SLURM: {e}")
             exit(1)
+        logger.debug("  Finished: Getting jobs from sacct")
 
 
 class NodePartitions:
     def __init__(self):
+        logger.debug("  Starting: Getting Node -> Partition associations")
         try:
             s = subprocess.run(
                 f"{SLURM_BIN_DIR}/sinfo -h -o '%n,%P'",
@@ -66,6 +69,7 @@ class NodePartitions:
         except Exception as e:
             print(f"Failed to parse node partition data: {e}")
             exit(1)
+        logger.debug("  Finished: Getting Node -> Partition associations")
 
     def get_partition(self, node: str) -> str:
         try:
@@ -76,6 +80,7 @@ class NodePartitions:
 
 class AccountStorages:
     def __init__(self):
+        logger.debug("  Starting: Getting Account -> StorageGB")
         try:
             cmd = f"{GPFS_BIN_DIR}/mmrepquota -j fs1 --block-size g | awk '/FILESET/ {{print $1\",\"$4}}'"
             s = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
@@ -88,6 +93,7 @@ class AccountStorages:
         except Exception as e:
             print(f"Failed to parse GPFS storage data: {e}")
             exit(1)
+        logger.debug("  Finished: Getting Account -> StorageGB")
 
     def get_storage(self, account: str) -> int:
         try:
@@ -98,6 +104,7 @@ class AccountStorages:
 
 class AccountPIs:
     def __init__(self):
+        logger.debug("  Starting: Getting Account -> PI associations")
         out = {}
         try:
             s = subprocess.run(
@@ -114,6 +121,7 @@ class AccountPIs:
             print(f"Failed to parse account PI data: {e}")
             exit(1)
         self.account_pi = out
+        logger.debug("  Finished: Getting Account -> PI associations")
 
     def get_pi(self, account: str) -> str:
         try:
