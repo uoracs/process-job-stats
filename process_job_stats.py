@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import logging
 import os
 import subprocess
 import sys
@@ -10,6 +11,8 @@ from datetime import date, datetime, timedelta
 from enum import Enum
 from pwd import getpwuid
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 YESTERDAY_DATE = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -103,7 +106,6 @@ class AccountPIs:
             proj_fdirs = [
                 line.strip() for line in s.stdout.decode().split("\n") if line.strip()
             ]
-            print("pi,account,date")
             for d in proj_fdirs:
                 account = d.split("/")[-1]
                 pi = getpwuid(os.stat(d).st_uid).pw_name
@@ -298,8 +300,17 @@ def main():
     parser.add_argument(
         "-n", "--noheader", required=False, help="don't show header row"
     )
+    parser.add_argument(
+        "-d", "--debug", required=False, action="store_true", help="show debug logging"
+    )
     args = parser.parse_args()
 
+    log_level = logging.INFO
+    if args.debug:
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level)
+
+    logger.debug("Started Processing")
     out = sys.stdout
     try:
         if args.output:
@@ -307,6 +318,7 @@ def main():
     except:
         out.close()
         raise
+    logger.debug(f"Output file: {out}")
     writer = csv.writer(out)
 
     nps = NodePartitions()
@@ -315,6 +327,7 @@ def main():
 
     try:
         for i, line in enumerate(sys.stdin):
+            logger.debug(f"Processing job {i}")
             job = Job(line, node_partitions=nps, account_storages=ass, account_pis=aps)
             if not args.noheader and i == 0:
                 print(",".join(job.keys()), file=out)
